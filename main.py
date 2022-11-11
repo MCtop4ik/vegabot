@@ -98,8 +98,16 @@ async def wiki(msg: types.Message):
 @dp.message_handler(commands=["cities"])
 async def play_cities(msg: types.Message):
     message = msg.text[7:]
-    cur.execute('INSERT INTO game(tgid, path, move) VALUES (?, ?, ?)', (id, "", 0))
-    base.commit()
+    citybase = sqlite3.connect('city.db')
+    curcity = citybase.cursor()
+    curcity.execute("SELECT path FROM game WHERE tgid = ?", (msg.chat.id,))
+    data = curcity.fetchall()
+    if len(data) == 0:
+        curcity.execute('INSERT INTO game(tgid, path, move) VALUES (?, ?, ?)', (msg.chat.id, "", 0))
+        base.commit()
+    else:
+        pass
+
     a = db.getlastcity(msg.chat.id)
     move = db.returnmove(msg.chat.id)
     if move == 0:
