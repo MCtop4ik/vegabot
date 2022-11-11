@@ -1,3 +1,4 @@
+
 import sqlite3
 import wikipedia
 
@@ -58,6 +59,8 @@ class Database:
     def getlastcity(self, id):
         cities = self.cur.execute('SELECT path FROM game WHERE tgid == ?', (id,)).fetchall()[0][0]
         cities_arr = cities.split('-> ')
+        if len(cities_arr) == 1:
+            return cities_arr[0]
         return cities_arr[len(cities_arr) - 1]
 
     def returnmove(self, id):
@@ -65,10 +68,12 @@ class Database:
         return move
 
     def rndcity(self, id, last_letter):
-        path = self.cur.execute('SELECT path FROM game WHERE tgid == ?', (id,)).fetchall()[0][0]
+        path = str(self.cur.execute('SELECT path FROM game WHERE tgid == ?', (id,)).fetchall()[0][0])
         cities = self.cur.execute('SELECT name FROM city WHERE firstletter == ?', (last_letter,)).fetchall()
-        for city in cities:
+        right = []
+        for i in range(len(cities)):
+            right.append(cities[i][0])
+        for city in right:
             if path.find(city) == -1:
                 return city
-        return "&sudo -"
-
+        return "$sudo -"
