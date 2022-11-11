@@ -1,15 +1,23 @@
-import asyncio
 import sqlite3
 import wikipedia
-import requests
-
-from bs4 import BeautifulSoup
-
 from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher
 from aiogram.utils import executor
 import random
 import Database
+from aiogram.types import ReplyKeyboardRemove, \
+    ReplyKeyboardMarkup, KeyboardButton, \
+    InlineKeyboardMarkup, InlineKeyboardButton
+
+button_hi = KeyboardButton('Привет! 👋')
+
+greet_kb = ReplyKeyboardMarkup()
+greet_kb.add(button_hi)
+
+button_help = KeyboardButton('Помощь')
+
+greet_kb1 = ReplyKeyboardMarkup()
+greet_kb1.add(button_help)
 
 TOKEN = "5675697408:AAGvQfcLXRLr1Rvcu_y6Qyv4bqrR9LPenbY"
 
@@ -35,12 +43,15 @@ print("ok")
 
 @dp.message_handler(commands=['start'])
 async def process_start_command(message: types.Message):
-    await message.reply("Привет!\nНапиши мне что-нибудь!")
+    await message.reply("Привет!\nНапиши мне что-нибудь!"
+                        "/help - помощь", reply_markup=greet_kb)
 
 
 @dp.message_handler(commands=['help'])
 async def process_help_command(message: types.Message):
-    await message.reply("Напиши мне что-нибудь, и я отпрпавлю этот текст тебе в ответ!")
+    await message.reply("Наш бот имеет множетсво команд."
+                        "Кроме того он является OpenSource проектом, так что любой его может скопировать его "
+                        "с https://github.com/MCtop4ik", reply_markup=greet_kb1)
 
 
 @dp.message_handler(commands=['rnd'])
@@ -51,10 +62,9 @@ async def process_help_command(message: types.Message):
 @dp.message_handler(commands=['addcity'])
 async def city_command(msg: types.Message):
     db.addindb(msg.text[9:])
-    # await msg.reply(msg.text)
-    # await bot.send_message(msg.from_user.id, msg.text)@dp.message_handler(commands=['getcity'])
 
 
+@dp.message_handler(commands=['getcity'])
 async def get_city(msg: types.Message):
     language = "ru"
     wikipedia.set_lang(language)
@@ -73,7 +83,15 @@ async def get_city(msg: types.Message):
 async def wiki(msg: types.Message):
     language = "ru"
     wikipedia.set_lang(language)
-    wikipage = wikipedia.page(msg.text[5:])
+    try:
+        wikipage = wikipedia.page(msg.text[5:])
+    except wikipedia.DisambiguationError as e:
+        s = random.choice(e.options)
+        try:
+            wikipage = wikipedia.page(s)
+        except wikipedia.DisambiguationError:
+            wikipage = wikipedia.page("Error 404")
+            await bot.send_message(msg.chat.id, "У слова много значений")
     summary = wikipage.summary
     if len(summary) > 1000:
         summary = summary[:1000]
@@ -81,54 +99,84 @@ async def wiki(msg: types.Message):
             if summary[i] == ".":
                 summary = summary[:i]
                 break
-        if len(wikipage.images) != 0:
-            image = wikipage.images[0]
-            for i in range(len(wikipage.images)):
-                img = wikipage.images[i]
-                if img[-4:] != '.svg' and img[-4:] != '.JPG':
-                    image = wikipage.images[i]
-                    break
-            if image[-4:] == '.svg' and image[-4:] == '.JPG':
-                image = 'https://cdn-icons-png.flaticon.com/512/2748/2748558.png'
-        else:
+    if len(wikipage.images) != 0:
+        image = wikipage.images[0]
+        for i in range(len(wikipage.images)):
+            img = wikipage.images[i]
+            if img[-4:] != '.svg' and img[-4:] != '.JPG':
+                image = wikipage.images[i]
+                break
+        if image[-4:] == '.svg' and image[-4:] == '.JPG':
             image = 'https://cdn-icons-png.flaticon.com/512/2748/2748558.png'
-        await bot.send_photo(msg.chat.id, image, caption=summary)
+    else:
+        image = 'https://cdn-icons-png.flaticon.com/512/2748/2748558.png'
+    print(summary)
+    print(image)
+    await bot.send_photo(msg.chat.id, image, caption=summary)
 
 
 @dp.message_handler(commands=["cities"])
 async def play_cities(msg: types.Message):
-    message = msg.text[7:]
+    message = msg.text[8:]
     citybase = sqlite3.connect('city.db')
     curcity = citybase.cursor()
     curcity.execute("SELECT path FROM game WHERE tgid = ?", (msg.chat.id,))
     data = curcity.fetchall()
     if len(data) == 0:
-        curcity.execute('INSERT INTO game(tgid, path, move) VALUES (?, ?, ?)', (msg.chat.id, "", 0))
-        base.commit()
+        curcity.execute('INSERT INTO game(tgid, path, move) VALUES (?, ?, ?)', (msg.chat.id, "-", 0))
+        citybase.commit()
     else:
+        print(data)
         pass
+
+    """a = '0123456789'
+    a[3]
+    """
 
     a = db.getlastcity(msg.chat.id)
     move = db.returnmove(msg.chat.id)
+    print(a)
     if move == 0:
         b = message
     else:
         b = db.rndcity(msg.chat.id, a[len(a) - 1])
     if b != "$sudo -":
-        if a[len(a) - 1] == 'ь':
-            if a[len(a) - 2] == b[0]:
+        if a[len(a) - 1] == '-':
+            db.setcityindb(msg.chat.id, message)
+            await bot.send_message(msg.from_user.id, message)
+        elif a[len(a) - 1] == 'ь':
+            print(a[len(a)-2])
+            print(b[0])
+            if a[len(a) - 2] == b[0].lower():
                 print("ВЕРНО")
-                db.setcityindb(msg.chat.id, message)
+                db.setcityindb(msg.chat.id, b)
+                await bot.send_message(msg.from_user.id, b)
             else:
                 print("НЕВЕРНО")
+                await bot.send_message(msg.from_user.id, "Неверный ответ")
         else:
-            if a[len(a) - 1] == b[0]:
+            print(a[len(a)-1])
+            print(b[0])
+            if a[len(a) - 1] == b[0].lower():
                 print("ВЕРНО")
-                db.setcityindb(msg.chat.id, message)
+                db.setcityindb(msg.chat.id, b)
+                await bot.send_message(msg.from_user.id, b)
             else:
                 print("НЕВЕРНО")
+                await bot.send_message(msg.from_user.id, "Неверный ответ")
     else:
         await bot.send_message(msg.from_user.id, "Город не найден в бд")
+
+
+@dp.message_handler(commands=["stop", "пауза", "стоп"])
+async def game_pause(msg: types.Message):
+    citybase = sqlite3.connect('city.db')
+    curcity = citybase.cursor()
+    await bot.send_message(msg.from_user.id, curcity.execute('SELECT path FROM game WHERE tgid == ?',
+                                                             (msg.chat.id,)).fetchall()[0][0])
+    curcity.execute('DELETE FROM game WHERE tgid == ?', (msg.chat.id,))
+    citybase.commit()
+    await bot.send_message(msg.from_user.id, "Игра окончена")
 
 
 @dp.message_handler()
@@ -149,6 +197,6 @@ async def answers(msg: types.Message):
     else:
         await bot.send_message(msg.chat.id, "Не поняла вашего ответа...")
 
-
 if __name__ == '__main__':
     executor.start_polling(dp)
+
